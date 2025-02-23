@@ -1,0 +1,151 @@
+#########################################################
+# REAL-TIME MARKDOWN EDITOR GELİŞTİRME REHBERİ (TXT)   #
+#########################################################
+
+=== PROJE HEDEFLERİ ===
+1. Kullanıcıların aynı anda düzenleyebileceği Markdown editör
+2. Gerçek zamanlı içerik senkronizasyonu (Socket.io)
+3. Oda bazlı çalışma sistemi
+4. SQLite + Redis entegrasyonu
+
+=== BAŞLANGIÇ ADIMLARI ===
+
+1. PROJE KLASÖR YAPISI:
+   /realtime-md-editor
+   ├── backend/
+   │   ├── server.js
+   │   ├── database/
+   │   └── controllers/
+   └── frontend/
+       ├── src/
+       └── public/
+
+2. BACKEND KURULUM:
+   - Gerekenler: Node.js v18+, Redis Server
+   - Komutlar:
+     cd backend
+     npm install express socket.io sqlite3 redis uuid
+
+3. FRONTEND KURULUM:
+   - Gerekenler: npm v9+
+   - Komutlar:
+     cd frontend
+     npx create-react-app . --template typescript
+     npm install socket.io-client marked @types/marked react-icons
+
+=== ANA ÖZELLİKLERİN KODLANMASI ===
+
+[1] SOCKET.IO BAĞLANTISI
+-----------------------------
+BACKEND (server.js):
+-----------------------------
+const io = require('socket.io')(httpServer, {
+  cors: { origin: "http://localhost:3000" }
+});
+
+// Odaya katılım
+io.on('connection', (socket) => {
+  socket.on('join-room', (roomId) => {
+    socket.join(roomId);
+    // Önceki içeriği yükle
+    const content = getContentFromDB(roomId); 
+    socket.emit('load-doc', content);
+  });
+  
+  // İçerik güncelleme
+  socket.on('send-changes', (delta) => {
+    socket.to(roomId).emit('receive-changes', delta);
+  });
+});
+
+FRONTEND (App.tsx):
+-----------------------------
+import { io } from 'socket.io-client';
+const socket = io('http://localhost:4000');
+
+// İçerik değişimini dinle
+useEffect(() => {
+  socket.on('receive-changes', (delta) => {
+    editorRef.current?.setContent(delta);
+  });
+}, []);
+
+[2] MARKDOWN RENDER
+-----------------------------
+// Preview bileşeni
+import { marked } from 'marked';
+
+function Preview({ content }: { content: string }) {
+  const parsed = marked.parse(content);
+  return <div dangerouslySetInnerHTML={{ __html: parsed }} />;
+}
+
+[3] ODA YÖNETİMİ (Redis)
+-----------------------------
+// Yeni oda oluşturma
+async function createRoom(roomId: string) {
+  await redisClient.set(`room:${roomId}`, JSON.stringify({
+    users: [],
+    content: ''
+  }));
+}
+
+// Kullanıcı ekleme
+async function addUser(roomId: string, userId: string) {
+  await redisClient.sAdd(`room:${roomId}:users`, userId);
+}
+
+=== TEST ADIMLARI ===
+
+1. BACKEND TEST:
+   - Komut: node server.js
+   - Postman ile test:
+     POST http://localhost:4000/api/room
+     Body: { "roomId": "test123" }
+
+2. FRONTEND TEST:
+   - Komut: npm start
+   - http://localhost:3000/room/test123 adresine 2 farklı tarayıcı ile bağlan
+   - Aynı anda yazmayı dene
+
+=== CANLIYA ALMA ===
+
+1. BACKEND (Heroku):
+   - heroku login
+   - git push heroku main
+   - heroku addons:create heroku-redis
+
+2. FRONTEND (Netlify):
+   - npm run build
+   - Drag & drop 'build' klasörü Netlify'a
+
+=== ÖNEMLİ NOTLAR ===
+
+* GÜVENLİK:
+  - Kullanıcı girişlerini sanitize et:
+    npm install sanitize-html
+
+* PERFORMANS:
+  - Büyük dokümanlarda debounce kullan:
+    let timeout;
+    const handleChange = (content) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        socket.emit('update', content);
+      }, 300);
+    };
+
+* HATA ÇÖZÜMLERİ:
+  - "Socket connection failed":
+    * Backend CORS ayarlarını kontrol et
+    * .env'de PORT değerlerini doğrula
+  - "Redis connection error":
+    * Redis server'ın çalıştığından emin ol
+    * sudo service redis-server restart
+
+#########################################################
+# İLERİ ADIMLAR İÇİN:                                   #
+# 1. Doküman versiyon geçmişi ekle (Git benzeri)        #
+# 2. Kullanıcı imleç takibi yap                        #
+# 3. Dökümanı PDF'e çevirme özelliği                   #
+#########################################################
