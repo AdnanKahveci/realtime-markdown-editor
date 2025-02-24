@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.3"
+  }
+}
