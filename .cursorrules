@@ -1,0 +1,93 @@
+**📝 CURSOR_RULES.md**  
+```markdown
+# 🖱️ Gerçek Zamanlı İmleç Senkronizasyonu Kuralları  
+
+---
+
+## 🔄 Veri Akışı Mekaniği  
+1. **Kullanıcı Hareketi Algılama**  
+   - CodeMirror'un `cursorActivity` event'i ile anlık pozisyon takibi.  
+   - Değişiklikler 200ms debounce ile sunucuya gönderilir.  
+
+2. **Supabase Realtime Abonelik**  
+   - `cursors` tablosuna abone olunarak diğer kullanıcıların hareketleri dinlenir:  
+   ```typescript
+   const subscription = supabase
+     .channel('room-cursors')
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'cursors' }, handleCursorUpdate)
+     .subscribe();
+   ```
+
+---
+
+## ⚠️ Çakışma Yönetimi  
+- **Son Güncelleme Zaman Damgası**  
+  Aynı kullanıcıdan gelen eski veriler (timestamp kontrolü ile) ignore edilir.  
+
+- **Atomic Updates**  
+  İmleç pozisyonları ayrı satırlarda güncellenir, çakışma riski yoktur.  
+
+---
+
+## 🎨 Renk Yönetimi  
+- **Kullanıcı Bazlı Renk**  
+  ```typescript
+  const color = `hsl(${hash(userId) % 360}, 70%, 60%)`;
+  ```
+- **LocalStorage'da Saklama**  
+  Kullanıcı yeniden katıldığında aynı renk korunur.  
+
+---
+
+## 🗂️ Supabase Tablo Tasarımı  
+**1. `rooms` Tablosu**  
+```sql
+CREATE TABLE rooms (
+  id UUID PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**2. `cursors` Tablosu**  
+```sql
+CREATE TABLE cursors (
+  user_id UUID REFERENCES auth.users,
+  room_id UUID REFERENCES rooms(id),
+  position JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, room_id)
+);
+```
+
+**3. RLS (Row Level Security)**  
+```sql
+-- Sadece oda üyeleri imleç görebilir
+CREATE POLICY "Cursor visibility" ON cursors 
+FOR SELECT USING (
+  EXISTS(SELECT 1 FROM room_members WHERE room_id = cursors.room_id AND user_id = auth.uid())
+);
+```
+
+---
+
+## 🔒 Güvenlik Kuralları  
+1. **Odaya Erişim Kontrolü**  
+   - `/room/:id` route'una erişim için JWT'de `room_id` claim kontrolü.  
+
+2. **Anonim Kullanıcılar**  
+   - LocalStorage'da `guest_` prefixli geçici ID üretilir.  
+
+3. **Rate Limiting**  
+   - Max 10 imleç güncellemesi/saniye kullanıcı başına.  
+```
+
+---
+
+**📂 Dosya Konumu:**  
+```
+└── project-root/
+    ├── backend/
+    ├── frontend/
+```  
+
+Bu yapı Supabase'in real-time özellikleriyle tam uyumludur. 🚀

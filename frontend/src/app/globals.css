@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+/* Dark mode için gerekli stiller */
+[data-color-mode="dark"] {
+  --md-bg-color: #1e1e1e;
+  --md-text-color: #ffffff;
+}
+
+/* Light mode için gerekli stiller */
+[data-color-mode="light"] {
+  --md-bg-color: #ffffff;
+  --md-text-color: #000000;
+}
+
+/* Markdown editör container stilleri */
+.w-md-editor {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border-radius: 0.5rem !important;
+}
+
+/* İmleç stilleri */
+.remote-cursor {
+  position: absolute;
+  width: 2px;
+  height: 1.2em;
+  background-color: currentColor;
+  pointer-events: none;
+} 
